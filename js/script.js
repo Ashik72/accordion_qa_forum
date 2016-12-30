@@ -32,7 +32,7 @@ jQuery(document).ready(function($) {
             type: 'POST',
             url: plugin_data.ajax_url,
             data: data,
-            async:false
+            async: false
           }).done(function(response) {
 
               if (response == "false") {
@@ -81,6 +81,8 @@ jQuery(document).ready(function($) {
                     var the_thread_id = $(this).data('topic_id');
                     var the_thread_title = $(this).data('title');
 
+                    $.ajaxSetup({async: false});
+
                     jQuery.post(plugin_data.ajax_url, data, function(response) {
 
                       if (response.length === 0)
@@ -93,11 +95,11 @@ jQuery(document).ready(function($) {
                         html += '<div data-common_sub_class="accordion_qa_forum_sub" data-unique_tag="accordion_qa_forum_sub_'+the_thread_id+'">';
 
                         $.each(response, function(i, content) {
-                          html += "<p data-comment_author="+content.comment_author+">";
+                          html += "<div class='parent_comment' data-stat='parent_comment' data-post_id="+content.comment_post_ID+" data-comment_id="+content.comment_ID+" data-comment_author="+content.comment_author+">";
                           html += "<strong><em>"+content.comment_author+": </strong></em><br>";
                           html += content.comment_content
-                          html += '<span data-comment_author="'+content.comment_author+'" class="comment_reply"><a href="#">Reply</a></span>';
-                          html += "</p>";
+                          html += '<span data-comment_author="'+content.comment_author+'" data-comment_id="'+content.comment_ID+'" class="comment_reply"><a href="#">Reply</a> | <span class="comment_time">'+content.comment_date+'</span></span>';
+                          html += "</div>";
 
                         })
 
@@ -105,6 +107,7 @@ jQuery(document).ready(function($) {
 
                         var main_data = the_thread.html();
                         the_thread.html(main_data+html);
+
 
                      }).always(function() {
 
@@ -121,7 +124,7 @@ jQuery(document).ready(function($) {
 
                          html_reply += '<br><textarea rows="4" cols="50" name="comment" placeholder="Replying on '+the_thread_title+'" form="thread_reply_form"></textarea>';
 
-                         html_reply += '<br><br><form data-thread_id="'+the_thread_id+'" data-replying_to_user="" action="" name="thread_reply_form"><input type="submit" value="Reply"></form>';
+                         html_reply += '<br><br><form data-parent_comment_id="" data-thread_id="'+the_thread_id+'" data-replying_to_user="" action="" name="thread_reply_form"><input type="submit" value="Reply"></form>';
 
 
                          html_reply += "</div>";
@@ -135,11 +138,18 @@ jQuery(document).ready(function($) {
                      });
 
 
+                     $.ajaxSetup({async: true}); //So as to avoid any other ajax calls made sybchrounously
+
                   })
 
 
+                  //forum_actions.load_child_comments();
 
-              //console.log(response);
+
+          }).always(function() {
+
+
+            forum_actions.load_child_comments();
 
           })
 
@@ -163,13 +173,18 @@ jQuery(document).ready(function($) {
 
         var thread_id = $(this).data("thread_id");
         var replying_to_user = $(this).data("replying_to_user");
+        var parent_comment_id = $(this).data("parent_comment_id");
+
+        console.log(parent_comment_id);
 
         var data = {
           'action' : 'replying_forum_thread',
           'post_id' : thread_id,
           'reply_val' : reply_val,
-          'replying_to_user' : replying_to_user
+          'replying_to_user' : replying_to_user,
+          'parent_comment_id' : parent_comment_id
         };
+
 
         var the_form_el = $(this);
 
@@ -198,8 +213,11 @@ jQuery(document).ready(function($) {
         var commenter = $(this).data("comment_author");
         var parent_div = $(this).parent().parent().parent();
         var the_reply_form = parent_div.find("form[name='thread_reply_form']");
+        var comment_id = $(this).data("comment_id");
 
         the_reply_form.attr("data-replying_to_user", commenter);
+        the_reply_form.attr("data-parent_comment_id", comment_id);
+
         the_reply_form.siblings("textarea").attr("placeholder", "Replying to " + commenter);
         //console.log(the_reply_form.data("thread_id"));
 
@@ -283,7 +301,68 @@ jQuery(document).ready(function($) {
       })
 
 
+    },
+
+    load_child_comments: function() {
+
+      $('.parent_comment').each(function(i, pComment) {
+
+        var postID = $(this).data("post_id");
+        var commentID = $(this).data("comment_id");
+
+
+        var data = {
+          'action' : 'request_forum_reply_comments',
+          'postID' : postID,
+          'commentID' : commentID
+
+        };
+
+
+        // //'post_id' : $(this).data('topic_id')
+        var the_thread = $(this);
+        var the_thread_id = $(this).data('topic_id');
+        var the_thread_title = $(this).data('title');
+
+        jQuery.post(plugin_data.ajax_url, data, function(response) {
+
+          response = JSON.parse(response);
+
+          if (response.length === 0)
+            return;
+
+
+            console.log(response);
+
+            $.each(response, function(i, content) {
+
+              console.log(content.comment_content);
+
+                var html = "";
+
+                html += "<div class='child_comment' data-stat='child_comment' >";
+                html += "<strong><em>"+content.comment_author+": </strong></em><br>";
+                html += content.comment_content
+                html += '';
+                html += '<span class="comment_reply"><span class="comment_time">'+content.comment_date+'</span></span>';
+
+                html += "</div>";
+
+              var main_data = the_thread.html();
+              the_thread.html(main_data+html);
+
+
+
+            })
+
+
+         })
+
+
+      })
+
     }
+
 
   }
 

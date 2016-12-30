@@ -28,11 +28,42 @@ class TheForum
     add_action( 'wp_ajax_adding_forum_thread', array($this, 'adding_forum_thread_func') );
     add_action( 'wp_ajax_nopriv_adding_forum_thread', array($this, 'adding_forum_thread_func') );
 
+    add_action( 'wp_ajax_request_forum_reply_comments', array($this, 'request_forum_reply_comments_func') );
+    add_action( 'wp_ajax_nopriv_request_forum_reply_comments', array($this, 'request_forum_reply_comments_func') );
+
 
     add_shortcode( 'qa_forum_add_topic', array($this, 'qa_forum_add_topic_func') );
 
+    //add_action('wp_footer', array($this, 'tst_func'));
+
   }
 
+  public function tst_func() {
+
+
+        $post_id = 251;
+        $commentID = 27;
+
+        $data = get_comments( array('post_id' => $post_id, 'order' => 'ASC' , 'status' => 'approve', 'parent' => $commentID) );
+
+        d($data);
+  }
+
+  public function request_forum_reply_comments_func() {
+
+    if (empty($_POST['postID']) || empty($_POST['commentID']))
+      wp_die();
+
+    $post_id = $_POST['postID'];
+    $commentID = $_POST['commentID'];
+
+    $data = get_comments( array('post_id' => $post_id, 'order' => 'ASC' , 'status' => 'approve', 'parent' => $commentID) );
+
+    echo json_encode($data);
+
+    wp_die();
+
+  }
 
   public function adding_forum_thread_func() {
 
@@ -92,7 +123,7 @@ $commentdata = array(
 	'comment_author' => $userName, //fixed value - can be dynamic
 	'comment_content' => $comment_text, //fixed value - can be dynamic
 	'comment_type' => '', //empty for regular comments, 'pingback' for pingbacks, 'trackback' for trackbacks
-	'comment_parent' => 0, //0 if it's not a reply to another comment; if it's a reply, mention the parent comment ID here
+	'comment_parent' => (empty($_POST['parent_comment_id']) ? 0 : $_POST['parent_comment_id']), //0 if it's not a reply to another comment; if it's a reply, mention the parent comment ID here
 	'user_id' => $current_user_id, //passing current user ID or any predefined as per the demand
 );
 
@@ -108,6 +139,9 @@ $comment_id = wp_new_comment( $commentdata );
 
   }
 
+
+
+
   public function request_forum_comments_func() {
 
     if (empty($_POST['post_id']))
@@ -115,7 +149,7 @@ $comment_id = wp_new_comment( $commentdata );
 
     $post_id = $_POST['post_id'];
 
-    $data = get_comments( array('post_id' => $post_id) );
+    $data = get_comments( array('post_id' => $post_id, 'order' => 'ASC' , 'status' => 'approve', 'parent' => 0) );
 
     echo json_encode($data);
 
@@ -157,10 +191,11 @@ public function qa_forum_add_topic_func($atts) {
 
     $titles = array();
     $main_contents = array();
-
     foreach ($forum_topic_posts as $key => $forum_topic_post) {
       $titles[] = $forum_topic_post->post_title;
       $main_contents[] = $forum_topic_post->post_content;
+
+      $forum_topic_posts[$key]->post_content = wpautop($forum_topic_post->post_content);
     }
 
     $return_data = array('titles' => $titles, 'main_contents' => $main_contents, 'forum_topic_posts' => $forum_topic_posts );

@@ -2,9 +2,10 @@
   padding: 3rem;
 }
 
-[data-common_sub_class="accordion_qa_forum_sub"] p, [data-common_sub_class="accordion_qa_forum_sub_reply"] div {
+[data-common_sub_class="accordion_qa_forum_sub"] div, [data-common_sub_class="accordion_qa_forum_sub"] p, [data-common_sub_class="accordion_qa_forum_sub_reply"] div {
   border: 3px solid gray;
   padding: 1rem;
+  margin: 1rem;
 }
 
 
