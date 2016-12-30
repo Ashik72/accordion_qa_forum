@@ -1,0 +1,18 @@
+[data-common_sub_class="accordion_qa_forum_sub"], [data-common_sub_class="accordion_qa_forum_sub_reply"] {
+  padding: 3rem;
+}
+
+[data-common_sub_class="accordion_qa_forum_sub"] p, [data-common_sub_class="accordion_qa_forum_sub_reply"] div {
+  border: 3px solid gray;
+  padding: 1rem;
+}
+
+
+[data-common_sub_class="accordion_qa_forum_sub_reply"] div.status {
+  border: medium none;
+}
+
+
+.comment_reply {
+  float: right;
+}
