@@ -17,3 +17,7 @@
 .comment_reply {
   float: right;
 }
+
+.ui-accordion .ui-accordion-content {
+  height: auto !important;
+}

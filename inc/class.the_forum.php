@@ -14,6 +14,7 @@ class TheForum
   {
     add_action( 'wp_enqueue_scripts', array($this, 'enqueue_scripts') );
     add_shortcode( 'qa_forum', array($this, 'qa_forum_func') );
+    add_action( 'init', [$this, 'qa_acordion_forum_taxonomy'], 0 );
     add_action( 'init', array($this, 'qa_acordion_forum_post_type_func'), 0 );
 
     add_action( 'wp_ajax_request_forum_data', array($this, 'request_forum_data_func') );
@@ -34,7 +35,36 @@ class TheForum
 
     add_shortcode( 'qa_forum_add_topic', array($this, 'qa_forum_add_topic_func') );
 
+    add_action( 'wp_ajax_get_categories_json', array($this, 'get_categories_json_func') );
+    add_action( 'wp_ajax_nopriv_get_categories_json', array($this, 'get_categories_json_func') );
+
+    add_action( 'wp_ajax_get_cat_title_json', array($this, 'get_cat_title_json_func') );
+    add_action( 'wp_ajax_nopriv_get_cat_title_json', array($this, 'get_cat_title_json_func') );
+
     //add_action('wp_footer', array($this, 'tst_func'));
+
+
+  }
+
+  public function get_cat_title_json_func() {
+
+    $id = ( empty($_POST['id']) ? "" : $_POST['id'] );
+
+    if (empty($id))
+      return;
+
+    global $wpdb;
+
+    $results = $wpdb->get_results( "SELECT * FROM `wp_terms` WHERE term_id = {$id} LIMIT 1 ", OBJECT );
+    $result = array();
+
+    $results = (is_array($results) ? $results[0] : array());
+    $result['name'] = (empty($results->name) ? "" : $results->name);
+    $result['slug'] = (empty($results->slug) ? "" : $results->slug);
+
+
+    echo json_encode($results);
+    wp_die();
 
   }
 
@@ -46,7 +76,25 @@ class TheForum
 
         $data = get_comments( array('post_id' => $post_id, 'order' => 'ASC' , 'status' => 'approve', 'parent' => $commentID) );
 
-        d($data);
+        //d($data);
+
+        $args = array(
+          'numberposts' => -1,
+          'post_type'   => 'qa_acordion_forum_po',
+          'tax_query' => array(
+        		array(
+        			'taxonomy' => 'qa_acordion_forum_category',
+        			'field'    => 'term_taxonomy_id',
+        			'terms'    => 35,
+        		),
+        	),
+
+        );
+
+        $forum_topic_posts = get_posts( $args );
+
+        var_dump(count($forum_topic_posts));
+
   }
 
   public function request_forum_reply_comments_func() {
@@ -67,7 +115,7 @@ class TheForum
 
   public function adding_forum_thread_func() {
 
-    if (empty($_POST['post_title']) || empty($_POST['post_content']))
+    if (empty($_POST['post_title']) || empty($_POST['post_content']) || empty($_POST['category_id']))
       wp_die();
 
       ///
@@ -80,11 +128,14 @@ class TheForum
         'post_content'  => $_POST['post_content'],
         'post_status'   => ( empty($publish_stat) ? "draft" : "publish" ) ,
         'post_author'   => $user_id,
-        'post_type'     => 'qa_acordion_forum_po'
+        'post_type'     => 'qa_acordion_forum_po',
+    
       );
 
       // Insert the post into the database
       $insert_post = wp_insert_post( $my_post );
+
+      wp_set_object_terms( $insert_post, $_POST['category_id'], 'qa_acordion_forum_category' );
 
       if ($insert_post)
         echo "Success";
@@ -179,10 +230,24 @@ public function qa_forum_add_topic_func($atts) {
 
   public function request_forum_data_func() {
 
+    $cate_id = ( (empty($_POST['cat_id']) ? "" : $_POST['cat_id']) );
+
+    if (empty($cate_id))
+      return;
+
+    $cate_id = (int) $cate_id;
 
     $args = array(
       'numberposts' => -1,
-      'post_type'   => 'qa_acordion_forum_po'
+      'post_type'   => 'qa_acordion_forum_po',
+      'tax_query' => array(
+        array(
+          'taxonomy' => 'qa_acordion_forum_category',
+          'field'    => 'term_taxonomy_id',
+          'terms'    => $cate_id,
+        ),
+      ),
+
     );
 
     $forum_topic_posts = get_posts( $args );
@@ -245,6 +310,55 @@ public function qa_forum_add_topic_func($atts) {
 
   }
 
+  public function get_categories_json_func() {
+    global $wpdb;
+
+    $results = $wpdb->get_results( "SELECT * FROM `wp_term_taxonomy` WHERE taxonomy = 'qa_acordion_forum_category'", OBJECT );
+
+    echo json_encode($results);
+
+    wp_die();
+
+  }
+
+
+  public function get_categories() {
+    global $wpdb;
+
+    $results = $wpdb->get_results( "SELECT * FROM `wp_term_taxonomy` WHERE taxonomy = 'qa_acordion_forum_category'", OBJECT );
+
+    return $results;
+
+  }
+
+  public function get_category_posts($id = "") {
+    if (empty($id))
+      return;
+
+    global $wpdb;
+
+    $results = $wpdb->get_results( "SELECT object_id FROM `wp_term_relationships` WHERE term_taxonomy_id = {$id} ", OBJECT );
+
+    return $results;
+
+  }
+
+  public function get_cat_title($id = "") {
+
+    if (empty($id))
+      return;
+
+    global $wpdb;
+
+    $results = $wpdb->get_results( "SELECT name FROM `wp_terms` WHERE term_id = {$id} LIMIT 1 ", OBJECT );
+
+    $results = (is_array($results) ? $results[0] : array());
+    $results = (empty($results->name) ? "" : $results->name);
+
+
+    return $results;
+
+  }
 
   // Register Custom Post Type
   function qa_acordion_forum_post_type_func() {
@@ -283,7 +397,7 @@ public function qa_forum_add_topic_func($atts) {
   		'description'           => __( 'Q/A Forum Topic', 'accordion_qa_forum' ),
   		'labels'                => $labels,
   		'supports'              => array( 'title', 'editor', 'excerpt', 'author', 'thumbnail', 'comments', 'trackbacks', 'revisions', 'custom-fields', 'page-attributes', 'post-formats', ),
-  		'taxonomies'            => array( 'category', 'post_tag' ),
+  		'taxonomies'            => array( 'qa_acordion_forum_category' ),
   		'hierarchical'          => true,
   		'public'                => true,
   		'show_ui'               => true,
@@ -300,6 +414,43 @@ public function qa_forum_add_topic_func($atts) {
   		'show_in_rest'          => true,
   	);
   	register_post_type( 'qa_acordion_forum_po', $args );
+
+  }
+
+  public function qa_acordion_forum_taxonomy() {
+
+    $labels = array(
+      'name'                       => _x( 'Forum Categories', 'Taxonomy General Name', 'text_domain' ),
+      'singular_name'              => _x( 'Forum Category', 'Taxonomy Singular Name', 'text_domain' ),
+      'menu_name'                  => __( 'Forum Category', 'text_domain' ),
+      'all_items'                  => __( 'All Categories', 'text_domain' ),
+      'parent_item'                => __( 'Parent Category', 'text_domain' ),
+      'parent_item_colon'          => __( 'Parent Category:', 'text_domain' ),
+      'new_item_name'              => __( 'New Category Name', 'text_domain' ),
+      'add_new_item'               => __( 'Add New Category', 'text_domain' ),
+      'edit_item'                  => __( 'Edit Category', 'text_domain' ),
+      'update_item'                => __( 'Update Category', 'text_domain' ),
+      'view_item'                  => __( 'View Category', 'text_domain' ),
+      'separate_items_with_commas' => __( 'Separate categories with commas', 'text_domain' ),
+      'add_or_remove_items'        => __( 'Add or remove categories', 'text_domain' ),
+      'choose_from_most_used'      => __( 'Choose from the most used', 'text_domain' ),
+      'popular_items'              => __( 'Popular Categories', 'text_domain' ),
+      'search_items'               => __( 'Search Categories', 'text_domain' ),
+      'not_found'                  => __( 'Not Found', 'text_domain' ),
+      'no_terms'                   => __( 'No categories', 'text_domain' ),
+      'items_list'                 => __( 'Categories list', 'text_domain' ),
+      'items_list_navigation'      => __( 'Categories list navigation', 'text_domain' ),
+    );
+    $args = array(
+      'labels'                     => $labels,
+      'hierarchical'               => true,
+      'public'                     => true,
+      'show_ui'                    => true,
+      'show_admin_column'          => true,
+      'show_in_nav_menus'          => true,
+      'show_tagcloud'              => true,
+    );
+    register_taxonomy( 'qa_acordion_forum_category', array( 'post' ), $args );
 
   }
 
